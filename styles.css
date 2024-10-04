@@ -1,8 +1,13 @@
-/*
+.project-sync-displayerror {
+    border : 1px solid var(--background-modifier-error);
+    background: var(--background-primary-alt);
+    padding: 10px;
+}
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+.project-sync-displayerror-name {
+    font-weight: 400;
+}
 
-If your plugin does not need CSS, delete this file.
-
-*/
+.project-sync-displayerror-message {
+    color: var(--text-muted);
+}
