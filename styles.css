@@ -1,13 +1,28 @@
-.project-sync-displayerror {
-    border : 1px solid var(--background-modifier-error);
-    background: var(--background-primary-alt);
+.project-sync-displayerror-inline {
+    border : 5px solid var(--background-modifier-error);
+    color: var(--text-error);
     padding: 10px;
 }
 
-.project-sync-displayerror-name {
+.project-sync-displayerror-inline-name {
     font-weight: 400;
 }
 
-.project-sync-displayerror-message {
-    color: var(--text-muted);
+.project-sync-displayerror-inline-message {
+    font-weight: 100;
+}
+
+.project-sync-displayerror-modal-title {
+    text-align: center;
+    color: var(--text-error);
+}
+
+.project-sync-displayerror-modal-name {
+    font-weight: 400;
+    padding: 10px;
+}
+
+.project-sync-displayerror-modal-message {
+    font-weight: 100;
+    padding: 20px;
 }
