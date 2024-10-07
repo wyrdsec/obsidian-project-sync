@@ -26,3 +26,38 @@
     font-weight: 100;
     padding: 20px;
 }
+
+.project-sync-button-div {
+    background-color: var(--background-primary-alt);
+    display: flex;
+    margin: 10px;
+    align-items: center;
+}
+
+.project-sync-button-text {
+    margin-left: 10px;
+}
+
+.project-sync-button-button {
+    padding: 10px;
+    margin: 10px;
+}
+
+.project-sync-button-button-success {
+    background-color: var(--background-modifier-success) !important;
+    padding: 10px;
+    margin: 10px;
+}
+
+.project-sync-button-icon-spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    100% {
+        -webkit-transform: rotate(360deg);
+        -moz-transform: rotate(360deg);
+        -o-transform: rotate(360deg);
+        transform: rotate(360deg);
+    }
+}
