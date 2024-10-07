@@ -1,11 +1,11 @@
 {
-	"id": "sample-plugin",
-	"name": "Sample Plugin",
+	"id": "project-sync",
+	"name": "Project Sync",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "Demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
-	"isDesktopOnly": false
+	"description": "Recursively copy contents of a Vault folder to another location on-disk. Configurable with code-blocks with the ability to exclude files with regex.",
+	"author": "wyrdsec",
+	"authorUrl": "https://github.com/wyrdsec",
+	"fundingUrl": "",
+	"isDesktopOnly": true
 }
