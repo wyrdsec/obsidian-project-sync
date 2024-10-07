@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-sample-plugin",
+	"name": "obsidian-project-sync",
 	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"description": "Recursively copy contents of a Vault folder to another location on-disk. Configurable with code-blocks with the ability to exclude files with regex.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
