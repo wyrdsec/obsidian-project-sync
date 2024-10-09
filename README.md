@@ -10,9 +10,16 @@ Any number of either arguments is allowed, but only the last `path` keyword is u
 
 ~~~~
 ```projsync
-path /home/wyrd/Documents/some_git_repo/notes/
+# Set path to sync to
+path ~/Documents/some_git_repo/notes/
+
+# Exclude the file exclude_me.md
 exclude exclude_me.md
+
+# Exclude any file ending in '.json'
 exclude .json$
+
+# Exclude any file starting with 'test'
 exclude ^test
 ```
 ~~~~

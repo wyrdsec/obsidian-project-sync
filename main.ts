@@ -1,6 +1,7 @@
 import { ButtonComponent, Modal, Notice, Plugin, App, TFile, TAbstractFile, TFolder, PluginSettingTab, Setting } from "obsidian";
 import { accessSync, existsSync, lstatSync, mkdirSync, statSync, writeFileSync } from "fs";
 import { constants } from "fs/promises";
+import { join as pathjoin, normalize as pathnormalize } from "path";
 
 interface ObsidianProjectSyncSettings {
 	followSymlinksDir: boolean;
@@ -14,22 +15,45 @@ const DEFAULT_SETTINGS: ObsidianProjectSyncSettings = {
 
 class ProjsyncBlock {
 	path: string;
+	prettypath: string;
 	exclude: Array<RegExp>;
 
 	constructor(source: string, followSymlinksDir: boolean) {
 		this.exclude = Array<RegExp>();
+		let path_found = false;
+
+		// Each Line
 		const rows = source.split("\n").filter((row) => row.length > 0);
 		for (let i=0; i < rows.length; i++) {
-			const words = rows[i].split(" ");
+
+			// Remove comments
+			let row = this.processcomments(rows[i]).trim();
+			if (row === ''){
+				continue;
+			}
+
+			// Each word in line
+			const words = row.split(" ");
 			if (words.length > 0) {
 				switch (words[0]) {
 					case "path":
-						let path = words.slice(1).join('');
+						if (path_found) {
+							throw SyntaxError("Only one path keyword allowed per block.");
+						}
+
+						// Prettify path
+						let path = words.slice(1).join(' ');
+						path = pathnormalize(path);
+						this.prettypath = path;
+
+						// Check if path is valid
+						path = this.processenvs(path);
 						this.path = this.pathcheck(path, followSymlinksDir);
+						path_found = true;
 						break;
-					
+
 					case "exclude":
-						let excludePathStr = words.slice(1).join('');
+						let excludePathStr = words.slice(1).join(' ');
 						if (excludePathStr.length == 0) { break; }
 						let excludePath = new RegExp(excludePathStr);
 						if (!this.exclude.includes(excludePath)) { this.exclude.push(excludePath); }
@@ -45,6 +69,33 @@ class ProjsyncBlock {
 		if (this.path == undefined) { throw SyntaxError("Path value was not set."); };
 	}
 
+	// Remove comments from line
+	processcomments(path: string) : string {
+		let reg = RegExp('#.*$');
+		return path.replace(reg, '');
+	}
+
+	// Replace common env variables
+	processenvs(path: string) : string {
+		let envs : { [key: string]: any }= {
+			"$HOME" : process.env.HOME,
+			"~" : process.env.HOME
+		};
+
+		for (let key in envs) {
+			let val = envs[key];
+			if (val === undefined){
+				continue;
+			}
+			else {
+				path = path.replace(key, val);
+			}
+		}
+
+		return path;
+	}
+
+	// Validate path exists, optionally isn't symlink, and we can access it.
 	pathcheck(path: string, followSymlinksDir: boolean) : string {
 		if (path.length == 0) { throw TypeError("Path is empty."); }
 		if (!existsSync(path)) { throw TypeError("Path does not exist."); }
@@ -73,28 +124,31 @@ export default class ObsidianProjectSync extends Plugin {
 	settings: ObsidianProjectSyncSettings;
 
 	async onload() {
-
 		await this.loadSettings();
 
+		// codeblock processor
 		this.registerMarkdownCodeBlockProcessor("projsync", (source, el, ctx) => {
 			try {
 				const psb = new ProjsyncBlock(source, this.settings.followSymlinksDir);
 
+				// Buttons and text
 				var buttonDiv = el.createEl("div", { cls: "project-sync-button-div"});
 				var button = new ButtonComponent(buttonDiv);
-				buttonDiv.createEl("div", {text: `Sync to ${psb.path}`, cls: "project-sync-button-text"});
+				buttonDiv.createEl("div", {text: `Sync to ${psb.prettypath}`, cls: "project-sync-button-text"});
 				this.setButtonIcon(button, "sync", "project-sync-button-button");
 				button.setTooltip("Sync to filesystem", {delay: 0, placement: 'bottom'});
 
+				// Activate spinner, sync to path, deactivate spinner, activate checkmark, reset
 				button.onClick(async(evt: MouseEvent) => {
 					button.buttonEl.children[0].addClass("project-sync-button-icon-spin");
-					await this.sync(psb, button);
+					await this.sync(psb);
 					button.buttonEl.children[0].removeClass("project-sync-button-icon-spin");
 					this.setButtonIcon(button, "check", "project-sync-button-button-success");
 					await this.delay(2000);
 					button.buttonEl.removeClass("project-sync-button-button-success");
 					this.setButtonIcon(button, "sync", "project-sync-button-button");
 				})
+			// Catch errors and display them in codeblock
 			} catch(e: unknown) {
 				const displayError = el.createEl("div", { cls: "project-sync-displayerror-inline" });
 				displayError.createEl("div", {text: `${(e as Error).name}`, cls: "project-sync-displayerror-inline-name"});
@@ -117,12 +171,11 @@ export default class ObsidianProjectSync extends Plugin {
 
 	}
 
-	async sync(psb: ProjsyncBlock, button?: ButtonComponent){
+	// Sync vault folder(s) to specified path
+	async sync(psb: ProjsyncBlock){
 		try{
-			let syncPath: string;
-			if (!psb.path.endsWith('/')) { syncPath = psb.path + '/'; }
-			else { syncPath = psb.path; }
 
+			// Get parent folder of note that contains projsync block
 			const active_file = this.app.workspace.getActiveFile();
 			if (active_file === null){
 				throw TypeError("No active file...");
@@ -131,7 +184,8 @@ export default class ObsidianProjectSync extends Plugin {
 			if (super_folder === null){
 				throw TypeError("No super folder....");
 			}
-			
+
+			// Get all files and folders except parent folder
 			let files: Array<TAbstractFile>;
 			if (super_folder.path === "/")
 				files = this.app.vault.getAllLoadedFiles().filter(file => {return file.path !== "/"});
@@ -151,7 +205,7 @@ export default class ObsidianProjectSync extends Plugin {
 			// First pass make directory structure
 			for (let i=0; i<files.length; i++) {
 				if (files[i] instanceof TFolder){
-					let syncDestDir: string = syncPath + (files[i].path.replace(super_folder.path+'/', ""));
+					let syncDestDir: string = pathjoin(psb.path, files[i].path.replace(super_folder.path+'/', ''));
 					if ( this.checkDir(syncDestDir) === false) {
 						mkdirSync(syncDestDir, {recursive: true});
 					}
@@ -171,13 +225,14 @@ export default class ObsidianProjectSync extends Plugin {
 						if (skip_file === true) { continue; }
 
 						// Check to see we can write to the file
-						let syncDestFile: string = syncPath + (files[i].path.replace(super_folder.path+'/', ""));
+						let syncDestFile: string = pathjoin(psb.path, files[i].path.replace(super_folder.path+'/', ''));
 						this.checkFile(syncDestFile);
 
 						// Get file content and write it to the sync folder
 						let fileContent: ArrayBuffer = await this.app.vault.readBinary(files[i] as TFile);
 						writeFileSync(syncDestFile, new Uint8Array(fileContent));
 					}
+					// Don't abort if a file fails, just alert user
 					catch (e: unknown) {
 						new Notice(`${(e as Error).message}`, 0);
 						continue;
@@ -186,6 +241,7 @@ export default class ObsidianProjectSync extends Plugin {
 			}
 
 		}
+		// Display error
 		catch(e: unknown) {
 			new ErrorModal(this.app, e as Error).open();
 		}
@@ -203,10 +259,11 @@ export default class ObsidianProjectSync extends Plugin {
 		catch { 
 			throw ReferenceError(`Insufficient permission to write to directory at '${dir}'`);
 		}
-		
+
 		return true;
 	}
 
+	// Check if file exists and if it does checks we can write to it
 	checkFile(file: string) {
 		if (file.length === 0) { throw TypeError("Empty string..."); }
 		if (!existsSync(file)) { return false; }
@@ -222,18 +279,21 @@ export default class ObsidianProjectSync extends Plugin {
 		return true;
 	}
 
+	// Sets button icon and css class
 	setButtonIcon(button: ButtonComponent, icon: string, classTo: string) {
 		button.setIcon(icon);
 		button.setClass(classTo);
 		button.setCta();
 	}
 
+	// Delay
 	async delay(ms: number) {
 		return new Promise( resolve => setTimeout(resolve, ms) );
 	}
 
 }
 
+// Helper class to create ok looking modal
 class ErrorModal extends Modal {
 	exp: Error;
 	
